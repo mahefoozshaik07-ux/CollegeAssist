@@ -1,0 +1,215 @@
+:root {
+  /* ==========================================================================
+     CollegeAssist Design System — Soft Pastel Academic Theme (Light Mode)
+     ========================================================================== */
+
+  /* Primary Surfaces & Canvas */
+  --bg-main: #FAF9F4;              /* Warm cream */
+  --bg-surface: #FFFFFF;           /* Pure white cards and surfaces */
+  --bg-surface-subtle: #F6F5EE;    /* Tinted warm cream for secondary panels */
+  --bg-header: rgba(250, 249, 244, 0.94); /* Translucent cream header */
+  --composer-gradient: linear-gradient(180deg, rgba(250, 249, 244, 0) 0%, rgba(250, 249, 244, 0.95) 28%, #FAF9F4 100%);
+
+  /* Pastel Accents */
+  --accent-mint: #CDE8D5;          /* Primary accent: soft mint */
+  --accent-mint-hover: #bde0c6;
+  --accent-mint-subtle: #EDF7F1;
+  --accent-mint-bubble: #E3F2E7;   /* User message bubble */
+  --accent-mint-border: #C1E1CB;
+  --accent-mint-text: #214F37;
+
+  --accent-blue: #DCEAF7;          /* Secondary accent: pale blue */
+  --accent-blue-hover: #cbdef2;
+  --accent-blue-subtle: #F0F6FD;
+  --accent-blue-bubble: #E7F1FB;
+  --accent-blue-border: #C9DFEE;
+  --accent-blue-text: #1F456B;
+
+  --accent-lavender: #E9E2F5;      /* Subtle accent: lavender */
+  --accent-lavender-hover: #dccee9;
+  --accent-lavender-subtle: #F6F3FB;
+  --accent-lavender-border: #DBD1EE;
+  --accent-lavender-text: #4C3070;
+
+  /* Typography Hierarchy */
+  --text-main: #28332F;            /* Dark charcoal */
+  --text-secondary: #737E78;       /* Muted gray-green */
+  --text-muted: #95A09A;           /* Light muted gray-green */
+  --text-inverse: #FFFFFF;
+
+  /* Borders & Dividers */
+  --border-neutral: #E8E9E2;       /* Soft neutral border */
+  --border-subtle: #F0F1EA;        /* Extra faint border */
+  --border-focus: #B4CEBE;         /* Focused border tone */
+
+  /* Error Colors */
+  --bg-error: #FAF6F3;
+  --border-error: #ECE3DC;
+  --text-error: #5D433A;
+  --icon-error: #A46955;
+  --btn-error-bg: #FFFFFF;
+  --btn-error-border: #DFD5CD;
+  --btn-error-hover: #F5EAE3;
+
+  /* Scrollbars */
+  --scrollbar-thumb: #D9DCD4;
+  --scrollbar-thumb-hover: #C4C8BE;
+
+  /* Shadows (Subtle & Soft — No Harsh Shadows) */
+  --shadow-subtle: 0 1px 3px rgba(40, 51, 47, 0.04);
+  --shadow-card: 0 2px 8px rgba(40, 51, 47, 0.04), 0 1px 2px rgba(40, 51, 47, 0.02);
+  --shadow-card-hover: 0 6px 16px rgba(40, 51, 47, 0.06), 0 2px 4px rgba(40, 51, 47, 0.03);
+  --shadow-composer: 0 4px 20px rgba(40, 51, 47, 0.05);
+  --shadow-drawer: -6px 0 24px rgba(40, 51, 47, 0.12);
+
+  /* Radii */
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 22px;
+  --radius-pill: 9999px;
+
+  /* Sizing */
+  --max-width-content: 800px;
+  --header-height: 64px;
+
+  font-family: 'Inter', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  /* ==========================================================================
+     CollegeAssist Design System — Dark Mode Theme
+     ========================================================================== */
+
+  /* Surfaces & Canvas */
+  --bg-main: #171A19;              /* Dark charcoal background */
+  --bg-surface: #222725;           /* Lighter charcoal cards & surfaces */
+  --bg-surface-subtle: #292F2C;    /* Elevated surface tone */
+  --bg-header: rgba(23, 26, 25, 0.94); /* Translucent dark header */
+  --composer-gradient: linear-gradient(180deg, rgba(23, 26, 25, 0) 0%, rgba(23, 26, 25, 0.95) 28%, #171A19 100%);
+
+  /* Pastel Accents — Calibrated for readable dark contrast */
+  --accent-mint: #274334;
+  --accent-mint-hover: #315341;
+  --accent-mint-subtle: #1C2E24;
+  --accent-mint-bubble: #20382B;   /* User message bubble */
+  --accent-mint-border: #3A634C;
+  --accent-mint-text: #A6E3BE;
+
+  --accent-blue: #203548;
+  --accent-blue-hover: #29425A;
+  --accent-blue-subtle: #182836;
+  --accent-blue-bubble: #1C3042;
+  --accent-blue-border: #315272;
+  --accent-blue-text: #B8DBFA;
+
+  --accent-lavender: #352643;
+  --accent-lavender-hover: #433155;
+  --accent-lavender-subtle: #281D33;
+  --accent-lavender-border: #563E6E;
+  --accent-lavender-text: #E0C8F7;
+
+  /* Typography Hierarchy */
+  --text-main: #F0F3F1;            /* Off-white text */
+  --text-secondary: #9BA7A1;       /* Muted gray-green secondary text */
+  --text-muted: #6B7771;
+  --text-inverse: #171A19;
+
+  /* Borders & Dividers */
+  --border-neutral: #2F3633;       /* Subtle dark border */
+  --border-subtle: #252B28;
+  --border-focus: #4F8567;
+
+  /* Error Colors */
+  --bg-error: #2A1F1D;
+  --border-error: #4A332E;
+  --text-error: #F2D2CB;
+  --icon-error: #D98877;
+  --btn-error-bg: #222725;
+  --btn-error-border: #4A332E;
+  --btn-error-hover: #352623;
+
+  /* Scrollbars */
+  --scrollbar-thumb: #3A433F;
+  --scrollbar-thumb-hover: #4D5853;
+
+  /* Shadows for Dark Mode */
+  --shadow-subtle: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-card-hover: 0 6px 18px rgba(0, 0, 0, 0.45), 0 2px 4px rgba(0, 0, 0, 0.25);
+  --shadow-composer: 0 4px 20px rgba(0, 0, 0, 0.4);
+  --shadow-drawer: -6px 0 24px rgba(0, 0, 0, 0.5);
+
+  color-scheme: dark;
+}
+
+/* Reset & Box Sizing */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  min-height: 100vh;
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Accessible focus ring */
+:focus-visible {
+  outline: 2px solid var(--accent-mint-border);
+  outline-offset: 2px;
+}
+
+/* Custom Soft Scrollbars */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: var(--radius-pill);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
+button, input, textarea, select {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  background: none;
+  border: none;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
