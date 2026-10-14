@@ -69,6 +69,20 @@ public class ChatController {
     }
 
     /**
+     * Triggers dynamic document reindexing across all markdown files and PDFs.
+     */
+    @PostMapping("/reindex")
+    public ResponseEntity<Map<String, Object>> reindex(
+            @RequestParam(value = "force", defaultValue = "false") boolean force) {
+        chatService.reindex(force);
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("status", "SUCCESS");
+        resp.put("message", "Document knowledge base reindexed successfully.");
+        resp.put("details", chatService.getStatus().getMessage());
+        return ResponseEntity.ok(resp);
+    }
+
+    /**
      * Retrieves all chat history conversations for the given student.
      */
     @GetMapping({"/conversations", "/history"})

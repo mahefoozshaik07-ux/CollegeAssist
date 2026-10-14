@@ -65,6 +65,26 @@ public class ScoredKnowledgeChunk implements Comparable<ScoredKnowledgeChunk> {
         return chunk.getWordCount();
     }
 
+    public int getPageNumber() {
+        return chunk.getPageNumber();
+    }
+
+    public String getPageRange() {
+        return chunk.getPageRange();
+    }
+
+    public String getDocumentType() {
+        return chunk.getDocumentType();
+    }
+
+    public String getVersion() {
+        return chunk.getVersion();
+    }
+
+    public long getIngestionTimestamp() {
+        return chunk.getIngestionTimestamp();
+    }
+
     @Override
     public int compareTo(ScoredKnowledgeChunk other) {
         // Descending order by score

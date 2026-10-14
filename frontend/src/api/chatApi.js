@@ -1,8 +1,6 @@
 // Reusable API client helper for CollegeAssist AI Chatbox
 // Connects to Spring Boot backend at VITE_API_BASE_URL or http://localhost:8080
-
-import { API_BASE_URL } from './studentApi'
-
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
 /**
  * Sends a student query to the Spring Boot /api/chat endpoint.
  *

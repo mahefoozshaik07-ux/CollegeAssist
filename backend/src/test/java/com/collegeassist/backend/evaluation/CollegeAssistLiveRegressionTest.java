@@ -52,7 +52,7 @@ class CollegeAssistLiveRegressionTest {
         documentKnowledgeService = new DocumentKnowledgeService("docs");
         documentKnowledgeService.loadDocuments();
         assertTrue(documentKnowledgeService.isLoaded(), "Knowledge base must be loaded");
-        assertEquals(7, documentKnowledgeService.getDocumentCount(), "All 7 institutional documents must be loaded");
+        assertEquals(8, documentKnowledgeService.getDocumentCount(), "All 8 institutional documents must be loaded");
 
         retrievalService = new KnowledgeRetrievalService(documentKnowledgeService, 10.0, 3);
     }

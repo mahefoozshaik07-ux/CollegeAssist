@@ -98,7 +98,8 @@ public class HybridRetrievalService {
             "placement", "placements", "cdc", "pat", "internship", "internships", "recruiter", "recruiters",
             "recruitment", "ppo", "ctc", "package", "super dream", "dream offer", "job", "career",
             "ragging", "anti-ragging", "udc", "disciplinary", "discipline", "id card", "rules", "regulations",
-            "circular", "circulars", "notice", "notices", "handbook", "policy", "policies"
+            "circular", "circulars", "notice", "notices", "handbook", "policy", "policies",
+            "cat-i", "cat-ii", "add/drop", "passing criteria"
     );
 
     private final DocumentKnowledgeService documentKnowledgeService;
@@ -167,6 +168,12 @@ public class HybridRetrievalService {
         persistIndexToDisk();
         indexInitialized = true;
         logger.info("HybridRetrievalService: Initialized BM25 & Semantic Vector Index across {} chunks", chunks.size());
+    }
+
+    public synchronized void reindex(boolean force) {
+        documentKnowledgeService.reindex(force);
+        indexInitialized = false;
+        initializeIndex();
     }
 
     private void persistIndexToDisk() {
@@ -352,16 +359,26 @@ public class HybridRetrievalService {
             }
         }
 
-        // If query asks for attendance requirements/eligibility/threshold, boost the section specifically covering minimum threshold
+        // If query asks for attendance requirements/eligibility/threshold/shortage, boost the section specifically covering minimum threshold
         if (chunk.getSourcePath().contains("attendance-policy.md") && secTitleNorm.contains("minimum attendance threshold")) {
+            boolean hasAttendanceToken = queryTokens.contains("attendance");
             boolean hasReqToken = queryTokens.contains("requirement") || queryTokens.contains("requirements")
                     || queryTokens.contains("threshold") || queryTokens.contains("eligibility") || queryTokens.contains("minimum")
-                    || queryTokens.contains("fat");
-            if (hasReqToken) {
-                score += 15.0;
+                    || queryTokens.contains("shortage");
+            if (hasAttendanceToken && hasReqToken) {
+                score += 30.0;
                 matchedTerms.add("attendance-threshold-section (attendance-policy.md)");
             }
         }
+
+        // Boost grading sections for F and N grades comparison queries
+        if (queryTokens.contains("f") && queryTokens.contains("n")) {
+            if (secTitleNorm.contains("grading system") || secTitleNorm.contains("table 4") || secTitleNorm.contains("letter grade") || secTitleNorm.contains("backlog")) {
+                score += 20.0;
+                matchedTerms.add("f-and-n-grades (Academic-Regulations.pdf)");
+            }
+        }
+
 
         List<String> secTitleTokens = extractTerms(secTitleNorm);
         List<String> secTitleStems = secTitleTokens.stream().map(this::stemWord).collect(Collectors.toList());
@@ -539,10 +556,11 @@ public class HybridRetrievalService {
         Matcher m = WORD_PATTERN.matcher(text.toLowerCase(Locale.ENGLISH));
         while (m.find()) {
             String word = m.group();
-            if (word.length() > 1 || Character.isDigit(word.charAt(0))) {
+            if (word.length() > 1 || Character.isDigit(word.charAt(0)) || "fnwups".indexOf(word.charAt(0)) != -1) {
                 terms.add(word);
             }
         }
+
         return terms;
     }
 

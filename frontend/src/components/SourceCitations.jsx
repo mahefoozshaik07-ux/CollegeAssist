@@ -42,7 +42,8 @@ function deduplicateSources(sources) {
     if (!src) continue
     const filename = getDisplayFilename(src)
     const sectionTitle = getDisplaySection(src)
-    const dedupeKey = `${filename.toLowerCase()}::${(sectionTitle || '').toLowerCase()}`
+    const pageNumber = src.pageNumber && Number(src.pageNumber) > 0 ? Number(src.pageNumber) : null
+    const dedupeKey = `${filename.toLowerCase()}::${(sectionTitle || '').toLowerCase()}::${pageNumber || ''}`
 
     if (!seen.has(dedupeKey)) {
       seen.add(dedupeKey)
@@ -50,13 +51,15 @@ function deduplicateSources(sources) {
         id: dedupeKey,
         filename,
         sectionTitle,
-        category: src.category || null
+        category: src.category || null,
+        pageNumber
       })
     }
   }
 
   return unique
 }
+
 
 function SourceCitations({ sources = [] }) {
   const uniqueSources = deduplicateSources(sources)
@@ -117,11 +120,18 @@ function SourceCitations({ sources = [] }) {
                 {item.sectionTitle}
               </span>
             )}
+
+            {item.pageNumber && item.pageNumber > 0 && (
+              <span className="citation-section-badge" style={{ backgroundColor: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8' }} title={`PDF Page ${item.pageNumber}`}>
+                Page {item.pageNumber}
+              </span>
+            )}
           </div>
         ))}
       </div>
     </div>
   )
 }
+
 
 export default SourceCitations

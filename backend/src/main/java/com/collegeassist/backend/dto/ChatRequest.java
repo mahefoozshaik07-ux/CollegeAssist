@@ -16,6 +16,10 @@ public class ChatRequest {
     public ChatRequest() {
     }
 
+    public ChatRequest(String message) {
+        this(message, null);
+    }
+
     public ChatRequest(String message, String conversationId) {
         this.message = message;
         this.conversationId = conversationId;

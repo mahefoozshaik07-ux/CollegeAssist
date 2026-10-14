@@ -1,7 +1,7 @@
 package com.collegeassist.backend.service;
 
 import com.collegeassist.backend.model.ChatMessageRecord;
-import com.collegeassist.backend.repository.ChatMessageRecordRepository;
+import com.collegeassist.backend.repository.ChatHistoryStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,7 +37,7 @@ public class QuestionUnderstandingService {
     private static final Pattern COURSE_CODE_PATTERN = Pattern.compile("\\b[a-zA-Z]{3,4}\\d{3,4}[a-zA-Z]?\\b");
     private static final Pattern NUMBER_PATTERN = Pattern.compile("\\b\\d+(?:\\.\\d+)?%?\\b");
 
-    private final ChatMessageRecordRepository messageRecordRepository;
+    private final ChatHistoryStore chatHistoryStore;
 
     // Institutional Vocabulary for Spell Correction
     private static final Set<String> DOMAIN_VOCABULARY = Set.of(
@@ -120,8 +120,8 @@ public class QuestionUnderstandingService {
     );
 
     @Autowired(required = false)
-    public QuestionUnderstandingService(ChatMessageRecordRepository messageRecordRepository) {
-        this.messageRecordRepository = messageRecordRepository;
+    public QuestionUnderstandingService(ChatHistoryStore chatHistoryStore) {
+        this.chatHistoryStore = chatHistoryStore;
     }
 
     public QuestionUnderstandingService() {
@@ -201,7 +201,7 @@ public class QuestionUnderstandingService {
         String resolvedContext = null;
         String finalEnrichedQuery = expanded;
 
-        if (isFollowUp && conversationId != null && messageRecordRepository != null) {
+        if (isFollowUp && conversationId != null && chatHistoryStore != null) {
             resolvedContext = resolveConversationContext(conversationId);
             if (resolvedContext != null && !resolvedContext.isBlank()) {
                 finalEnrichedQuery = expanded + " " + resolvedContext;
@@ -347,12 +347,12 @@ public class QuestionUnderstandingService {
      * Resolves context from recent turns in the message history repository.
      */
     public String resolveConversationContext(String conversationId) {
-        if (messageRecordRepository == null || conversationId == null || conversationId.isBlank()) {
+        if (chatHistoryStore == null || conversationId == null || conversationId.isBlank()) {
             return null;
         }
 
         try {
-            List<ChatMessageRecord> history = messageRecordRepository.findByConversationIdOrderBySequenceNumberAsc(conversationId);
+            List<ChatMessageRecord> history = chatHistoryStore.findMessagesByConversationIdOrderBySequenceNumberAsc(conversationId);
             if (history == null || history.isEmpty()) {
                 return null;
             }
@@ -406,10 +406,11 @@ public class QuestionUnderstandingService {
         Matcher matcher = WORD_PATTERN.matcher(text.toLowerCase(Locale.ENGLISH));
         while (matcher.find()) {
             String word = matcher.group();
-            if (word.length() > 1 || Character.isDigit(word.charAt(0))) {
+            if (word.length() > 1 || Character.isDigit(word.charAt(0)) || "fnwups".indexOf(word.charAt(0)) != -1) {
                 tokens.add(word);
             }
         }
+
         return tokens;
     }
 

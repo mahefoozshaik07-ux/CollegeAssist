@@ -185,11 +185,11 @@ class DocumentKnowledgeServiceTest {
         service.loadDocuments();
 
         assertTrue(service.isLoaded(), "Service should be initialized");
-        assertEquals(7, service.getDocumentCount(), "Should discover all 7 category documents in docs/");
+        assertEquals(8, service.getDocumentCount(), "Should discover all 8 category documents in docs/");
         assertTrue(service.getChunkCount() > 20, "Should generate chunks across all documents (expected > 20, got " + service.getChunkCount() + ")");
 
         List<String> categories = service.getLoadedCategories();
-        assertThat(categories, hasItems("attendance", "college-rules", "exam-rules", "fees", "hostel", "notices", "placements"));
+        assertThat(categories, hasItems("attendance", "college-rules", "exam-rules", "fees", "hostel", "notices", "placements", "academic"));
 
         Map<String, Integer> perDocCounts = service.getChunkCountByDocument();
         assertTrue(perDocCounts.containsKey("attendance-policy.md"));
@@ -199,6 +199,7 @@ class DocumentKnowledgeServiceTest {
         assertTrue(perDocCounts.containsKey("hostel-regulations.md"));
         assertTrue(perDocCounts.containsKey("career-development-centre.md"));
         assertTrue(perDocCounts.containsKey("campus-circulars-framework.md"));
+        assertTrue(perDocCounts.containsKey("Academic-Regulations.pdf"));
 
         // Verify metadata integrity on loaded chunks
         for (KnowledgeChunk chunk : service.getAllChunks()) {

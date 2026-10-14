@@ -47,7 +47,7 @@ class RagQualityEvaluationTest {
         documentKnowledgeService = new DocumentKnowledgeService("docs");
         documentKnowledgeService.loadDocuments();
         assertTrue(documentKnowledgeService.isLoaded(), "Institutional knowledge base must be loaded");
-        assertEquals(7, documentKnowledgeService.getDocumentCount(), "Exactly 7 verified Markdown documents must be loaded");
+        assertEquals(8, documentKnowledgeService.getDocumentCount(), "Exactly 8 verified documents must be loaded");
         assertTrue(documentKnowledgeService.getChunkCount() >= 40, "Should generate 40+ chunks from documents");
 
         retrievalService = new KnowledgeRetrievalService(documentKnowledgeService, 10.0, 3);

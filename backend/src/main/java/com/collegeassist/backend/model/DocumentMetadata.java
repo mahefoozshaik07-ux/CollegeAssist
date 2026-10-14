@@ -24,6 +24,9 @@ public class DocumentMetadata implements Serializable {
     private String sha256Checksum;
     private String filePath;
     private int chunkCount;
+    private int pageCount;
+    private String extractionStatus = "SUCCESS";
+    private String statusMessage = "";
 
     public DocumentMetadata() {
     }
@@ -159,6 +162,30 @@ public class DocumentMetadata implements Serializable {
 
     public void setChunkCount(int chunkCount) {
         this.chunkCount = chunkCount;
+    }
+
+    public int getPageCount() {
+        return pageCount;
+    }
+
+    public void setPageCount(int pageCount) {
+        this.pageCount = pageCount;
+    }
+
+    public String getExtractionStatus() {
+        return extractionStatus;
+    }
+
+    public void setExtractionStatus(String extractionStatus) {
+        this.extractionStatus = extractionStatus;
+    }
+
+    public String getStatusMessage() {
+        return statusMessage;
+    }
+
+    public void setStatusMessage(String statusMessage) {
+        this.statusMessage = statusMessage;
     }
 
     @Override

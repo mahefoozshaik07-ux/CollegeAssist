@@ -7,12 +7,12 @@ import com.collegeassist.backend.dto.ConversationSummaryDto;
 import com.collegeassist.backend.dto.SourceReference;
 import com.collegeassist.backend.model.ChatMessageRecord;
 import com.collegeassist.backend.model.Conversation;
-import com.collegeassist.backend.repository.ChatMessageRecordRepository;
-import com.collegeassist.backend.repository.ConversationRepository;
+import com.collegeassist.backend.repository.ChatHistoryStore;
+import com.collegeassist.backend.repository.InMemoryChatHistoryStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
@@ -28,23 +28,27 @@ public class ChatHistoryService {
     private static final Logger log = LoggerFactory.getLogger(ChatHistoryService.class);
     private static final String DEFAULT_STUDENT_EMAIL = "alex.student@university.edu";
 
-    private final ConversationRepository conversationRepository;
-    private final ChatMessageRecordRepository messageRecordRepository;
+    private final ChatHistoryStore chatHistoryStore;
     private final ObjectMapper objectMapper;
 
-    public ChatHistoryService(
-            ConversationRepository conversationRepository,
-            ChatMessageRecordRepository messageRecordRepository) {
-        this.conversationRepository = conversationRepository;
-        this.messageRecordRepository = messageRecordRepository;
+    @Autowired
+    public ChatHistoryService(ChatHistoryStore chatHistoryStore) {
+        this.chatHistoryStore = (chatHistoryStore != null) ? chatHistoryStore : new InMemoryChatHistoryStore();
         this.objectMapper = new ObjectMapper();
     }
 
+    public ChatHistoryService() {
+        this(new InMemoryChatHistoryStore());
+    }
+
+    public ChatHistoryStore getChatHistoryStore() {
+        return chatHistoryStore;
+    }
+
     /**
-     * Persists a completed chat turn (user question + assistant response) to the database.
+     * Persists a completed chat turn (user question + assistant response) to the history store.
      * Guaranteed to execute only after the backend successfully processes the response.
      */
-    @Transactional
     public void persistChatTurn(String conversationId, String studentEmail, String userText, ChatResponse response) {
         if (userText == null || userText.isBlank() || response == null) {
             return;
@@ -61,19 +65,19 @@ public class ChatHistoryService {
         long now = System.currentTimeMillis();
 
         // 1. Get or create conversation record
-        Conversation conversation = conversationRepository
-                .findByIdAndStudentEmail(effectiveConvId, effectiveEmail)
+        Conversation conversation = chatHistoryStore
+                .findConversationByIdAndStudentEmail(effectiveConvId, effectiveEmail)
                 .orElseGet(() -> {
                     String title = generateTitleFromQuestion(userText);
                     Conversation newConv = new Conversation(effectiveConvId, effectiveEmail, title, now, now);
-                    return conversationRepository.save(newConv);
+                    return chatHistoryStore.saveConversation(newConv);
                 });
 
         conversation.setUpdatedAt(now);
-        conversationRepository.save(conversation);
+        chatHistoryStore.saveConversation(conversation);
 
         // 2. Determine sequence number for messages
-        int currentCount = (int) messageRecordRepository.countByConversationId(effectiveConvId);
+        int currentCount = (int) chatHistoryStore.countMessagesByConversationId(effectiveConvId);
 
         // 3. Persist User message
         String userMsgId = "user-" + now + "-" + UUID.randomUUID().toString().substring(0, 5);
@@ -87,7 +91,7 @@ public class ChatHistoryService {
                 null,
                 currentCount + 1
         );
-        messageRecordRepository.save(userRecord);
+        chatHistoryStore.saveMessage(userRecord);
 
         // 4. Persist Assistant message with verified sources
         String sourcesJson = serializeSources(response.getSources());
@@ -105,7 +109,7 @@ public class ChatHistoryService {
                 sourcesJson,
                 currentCount + 2
         );
-        messageRecordRepository.save(asstRecord);
+        chatHistoryStore.saveMessage(asstRecord);
 
         log.debug("ChatHistoryService: Persisted turn for conversation {} (user: {})", effectiveConvId, effectiveEmail);
     }
@@ -113,17 +117,16 @@ public class ChatHistoryService {
     /**
      * Retrieves all conversations belonging to the authenticated student, ordered newest first.
      */
-    @Transactional(readOnly = true)
     public List<ConversationSummaryDto> getStudentConversations(String studentEmail) {
         String effectiveEmail = (studentEmail != null && !studentEmail.isBlank())
                 ? studentEmail.trim().toLowerCase()
                 : DEFAULT_STUDENT_EMAIL;
 
-        List<Conversation> conversations = conversationRepository.findByStudentEmailOrderByUpdatedAtDesc(effectiveEmail);
+        List<Conversation> conversations = chatHistoryStore.findConversationsByStudentEmailOrderByUpdatedAtDesc(effectiveEmail);
         List<ConversationSummaryDto> dtos = new ArrayList<>();
 
         for (Conversation conv : conversations) {
-            long count = messageRecordRepository.countByConversationId(conv.getId());
+            long count = chatHistoryStore.countMessagesByConversationId(conv.getId());
             dtos.add(new ConversationSummaryDto(
                     conv.getId(),
                     conv.getTitle(),
@@ -140,7 +143,6 @@ public class ChatHistoryService {
     /**
      * Retrieves a full conversation and its messages. Enforces strict ownership.
      */
-    @Transactional(readOnly = true)
     public Optional<ConversationDetailDto> getConversationDetails(String conversationId, String studentEmail) {
         if (conversationId == null || conversationId.isBlank()) {
             return Optional.empty();
@@ -150,13 +152,13 @@ public class ChatHistoryService {
                 ? studentEmail.trim().toLowerCase()
                 : DEFAULT_STUDENT_EMAIL;
 
-        Optional<Conversation> convOpt = conversationRepository.findByIdAndStudentEmail(conversationId.trim(), effectiveEmail);
+        Optional<Conversation> convOpt = chatHistoryStore.findConversationByIdAndStudentEmail(conversationId.trim(), effectiveEmail);
         if (convOpt.isEmpty()) {
             return Optional.empty();
         }
 
         Conversation conv = convOpt.get();
-        List<ChatMessageRecord> records = messageRecordRepository.findByConversationIdOrderBySequenceNumberAsc(conv.getId());
+        List<ChatMessageRecord> records = chatHistoryStore.findMessagesByConversationIdOrderBySequenceNumberAsc(conv.getId());
         List<ChatMessageDto> messageDtos = new ArrayList<>();
 
         for (ChatMessageRecord rec : records) {
@@ -184,7 +186,6 @@ public class ChatHistoryService {
     /**
      * Deletes a conversation and its messages. Enforces ownership check.
      */
-    @Transactional
     public boolean deleteConversation(String conversationId, String studentEmail) {
         if (conversationId == null || conversationId.isBlank()) {
             return false;
@@ -194,12 +195,12 @@ public class ChatHistoryService {
                 ? studentEmail.trim().toLowerCase()
                 : DEFAULT_STUDENT_EMAIL;
 
-        if (!conversationRepository.existsByIdAndStudentEmail(conversationId.trim(), effectiveEmail)) {
+        if (!chatHistoryStore.existsConversationByIdAndStudentEmail(conversationId.trim(), effectiveEmail)) {
             return false;
         }
 
-        messageRecordRepository.deleteByConversationId(conversationId.trim());
-        conversationRepository.deleteByIdAndStudentEmail(conversationId.trim(), effectiveEmail);
+        chatHistoryStore.deleteMessagesByConversationId(conversationId.trim());
+        chatHistoryStore.deleteConversationByIdAndStudentEmail(conversationId.trim(), effectiveEmail);
         log.info("ChatHistoryService: Deleted conversation {} for student {}", conversationId, effectiveEmail);
         return true;
     }

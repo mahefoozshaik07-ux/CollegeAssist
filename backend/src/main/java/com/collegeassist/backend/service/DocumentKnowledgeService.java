@@ -40,32 +40,51 @@ public class DocumentKnowledgeService {
     private static final Pattern H1_PATTERN = Pattern.compile("^#\\s+(.+)$", Pattern.MULTILINE);
 
     private final String configuredDocsPath;
-    private final DocumentIngestionService ingestionService = new DocumentIngestionService();
+    private final DocumentIngestionService ingestionService;
     private final List<KnowledgeChunk> chunks = new ArrayList<>();
     private int documentCount = 0;
     private Path resolvedDocsDirectory;
     private boolean loaded = false;
 
     public DocumentKnowledgeService() {
-        this("docs");
+        this("docs", new DocumentIngestionService());
+    }
+
+    public DocumentKnowledgeService(String configuredDocsPath) {
+        this(configuredDocsPath, new DocumentIngestionService());
     }
 
     @Autowired
-    public DocumentKnowledgeService(@Value("${collegeassist.knowledge.base-path:docs}") String configuredDocsPath) {
+    public DocumentKnowledgeService(
+            @Value("${collegeassist.knowledge.base-path:docs}") String configuredDocsPath,
+            @Autowired(required = false) DocumentIngestionService ingestionService) {
         this.configuredDocsPath = (configuredDocsPath != null && !configuredDocsPath.isBlank())
                 ? configuredDocsPath.trim()
                 : "docs";
+        this.ingestionService = ingestionService != null ? ingestionService : new DocumentIngestionService();
     }
 
     public DocumentKnowledgeService(Path explicitDocsDirectory) {
-        this.configuredDocsPath = (explicitDocsDirectory != null)
-                ? explicitDocsDirectory.toString()
-                : "docs";
+        this(explicitDocsDirectory != null ? explicitDocsDirectory.toString() : "docs", new DocumentIngestionService());
     }
 
     @PostConstruct
     public void init() {
         loadDocuments();
+    }
+
+    public synchronized void reindex(boolean force) {
+        chunks.clear();
+        documentCount = 0;
+        loaded = false;
+        resolvedDocsDirectory = resolveDocsPath();
+        if (resolvedDocsDirectory != null && Files.exists(resolvedDocsDirectory)) {
+            ingestionService.reindex(resolvedDocsDirectory, force);
+            chunks.addAll(ingestionService.getActiveChunks());
+            documentCount = ingestionService.getDocumentMetadataMap().size();
+            loaded = true;
+            logger.info("DocumentKnowledgeService: Reindexed {} document(s) into {} chunk(s).", documentCount, chunks.size());
+        }
     }
 
     /**

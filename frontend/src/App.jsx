@@ -1,12 +1,16 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import Header from './components/Header'
 import ChatBox from './components/ChatBox'
 import HistoryDrawer from './components/HistoryDrawer'
 import LogoutModal from './components/LogoutModal'
 import { getChatStatus, fetchConversationDetail } from './api/chatApi'
+import {
+  loadLocalSessions,
+  upsertLocalConversation,
+  clearAllLocalSessions
+} from './utils/localHistory'
 import './App.css'
 
-const STORAGE_KEY = 'collegeassist_chat_sessions_v3'
 const USER_EMAIL_KEY = 'collegeassist_student_email_v3'
 const THEME_KEY = 'collegeassist_theme'
 const DEFAULT_STUDENT_EMAIL = 'alex.student@university.edu'
@@ -41,7 +45,7 @@ function App() {
   const [userEmail, setUserEmail] = useState(() => {
     try {
       const saved = localStorage.getItem(USER_EMAIL_KEY)
-      if (saved) return saved
+      if (saved && saved.trim()) return saved.trim()
     } catch {
       // Fallback
     }
@@ -52,36 +56,16 @@ function App() {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const [backendStatus, setBackendStatus] = useState(null)
 
-  // Active conversation ID
+  // Active conversation ID restored from local history
   const [currentSessionId, setCurrentSessionId] = useState(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY)
-      if (saved) {
-        const parsed = JSON.parse(saved)
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed[0].id
-        }
-      }
-    } catch {
-      // Fallback
-    }
-    return null
+    const sessions = loadLocalSessions(DEFAULT_STUDENT_EMAIL)
+    return sessions.length > 0 ? sessions[0].id : null
   })
 
-  // Messages in active conversation
+  // Messages in active conversation restored from local history
   const [messages, setMessages] = useState(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY)
-      if (saved) {
-        const parsed = JSON.parse(saved)
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed[0].messages || []
-        }
-      }
-    } catch {
-      // Fallback
-    }
-    return []
+    const sessions = loadLocalSessions(DEFAULT_STUDENT_EMAIL)
+    return sessions.length > 0 ? (sessions[0].messages || []) : []
   })
 
   // Check backend integration status on initial load
@@ -94,7 +78,7 @@ function App() {
           setBackendStatus(status)
         }
       } catch {
-        // Fallback
+        // Fallback when backend is not ready
       }
     }
     checkStatus()
@@ -103,7 +87,7 @@ function App() {
     }
   }, [])
 
-  // Persist email
+  // Persist student email profile
   useEffect(() => {
     try {
       localStorage.setItem(USER_EMAIL_KEY, userEmail)
@@ -111,6 +95,13 @@ function App() {
       // Ignore
     }
   }, [userEmail])
+
+  // Automatically sync messages to browser localStorage on every turn
+  useEffect(() => {
+    if (currentSessionId && Array.isArray(messages) && messages.length > 0) {
+      upsertLocalConversation(userEmail, currentSessionId, messages)
+    }
+  }, [messages, currentSessionId, userEmail])
 
   // Reset to fresh welcome screen
   const handleNewChat = () => {
@@ -131,8 +122,18 @@ function App() {
     }
   }
 
-  // Load a conversation from history
+  // Load a conversation from history (checks local storage first, then backend)
   const handleSelectConversation = async (selectedId) => {
+    // 1. Instant load from browser local history
+    const localSessions = loadLocalSessions(userEmail)
+    const localMatch = localSessions.find((s) => s.id === selectedId)
+    if (localMatch && Array.isArray(localMatch.messages) && localMatch.messages.length > 0) {
+      setCurrentSessionId(selectedId)
+      setMessages(localMatch.messages)
+      return
+    }
+
+    // 2. Fallback to backend API if available
     try {
       const detail = await fetchConversationDetail(selectedId, userEmail)
       if (detail && Array.isArray(detail.messages)) {
@@ -146,20 +147,27 @@ function App() {
         }))
         setCurrentSessionId(selectedId)
         setMessages(formatted)
+        upsertLocalConversation(userEmail, selectedId, formatted, detail.title)
       }
     } catch (err) {
-      console.error('Failed to load conversation details:', err)
+      console.warn('Could not load conversation from backend, using local state:', err)
     }
   }
 
-  // Confirm logout: clear messages and reset
+  // Clear all local chat history
+  const handleClearAllHistory = () => {
+    clearAllLocalSessions(userEmail)
+    setCurrentSessionId(null)
+    setMessages([])
+  }
+
+  // Confirm logout: clear active messages and reset
   const handleConfirmLogout = () => {
     setLogoutModalOpen(false)
     setMessages([])
     setCurrentSessionId(null)
     setUserEmail(DEFAULT_STUDENT_EMAIL)
     try {
-      localStorage.removeItem(STORAGE_KEY)
       localStorage.removeItem(USER_EMAIL_KEY)
     } catch {
       // Ignore
@@ -200,6 +208,7 @@ function App() {
           currentConversationId={currentSessionId}
           onSelectConversation={handleSelectConversation}
           onNewChat={handleNewChat}
+          onClearAllHistory={handleClearAllHistory}
         />
       )}
 

@@ -4,19 +4,28 @@ import java.util.Objects;
 
 /**
  * Represents a segmented section (chunk) of an institutional knowledge-base document.
- * Preserves structural metadata (category, source path, section title) alongside the text content.
+ * Preserves structural metadata (category, source path, section title, page number, version) alongside text.
  */
 public class KnowledgeChunk {
 
-    private final String id;
-    private final String category;
-    private final String sourcePath;
-    private final String filename;
-    private final String documentTitle;
-    private final String sectionTitle;
-    private final String content;
-    private final int charCount;
-    private final int wordCount;
+    private String id;
+    private String category;
+    private String sourcePath;
+    private String filename;
+    private String documentTitle;
+    private String sectionTitle;
+    private String content;
+    private int charCount;
+    private int wordCount;
+    private int pageNumber;
+    private String pageRange;
+    private String documentType;
+    private String version;
+    private long ingestionTimestamp;
+
+    // No-arg constructor for Jackson serialization/deserialization
+    public KnowledgeChunk() {
+    }
 
     public KnowledgeChunk(
             String id,
@@ -26,6 +35,22 @@ public class KnowledgeChunk {
             String documentTitle,
             String sectionTitle,
             String content) {
+        this(id, category, sourcePath, filename, documentTitle, sectionTitle, content, 0, "", "POLICY", "1.0", System.currentTimeMillis());
+    }
+
+    public KnowledgeChunk(
+            String id,
+            String category,
+            String sourcePath,
+            String filename,
+            String documentTitle,
+            String sectionTitle,
+            String content,
+            int pageNumber,
+            String pageRange,
+            String documentType,
+            String version,
+            long ingestionTimestamp) {
         this.id = id != null ? id : "";
         this.category = category != null ? category : "";
         this.sourcePath = sourcePath != null ? sourcePath : "";
@@ -35,6 +60,11 @@ public class KnowledgeChunk {
         this.content = content != null ? content : "";
         this.charCount = this.content.length();
         this.wordCount = calculateWordCount(this.content);
+        this.pageNumber = pageNumber;
+        this.pageRange = pageRange != null ? pageRange : (pageNumber > 0 ? String.valueOf(pageNumber) : "");
+        this.documentType = documentType != null ? documentType : "POLICY";
+        this.version = version != null ? version : "1.0";
+        this.ingestionTimestamp = ingestionTimestamp > 0 ? ingestionTimestamp : System.currentTimeMillis();
     }
 
     private static int calculateWordCount(String text) {
@@ -81,6 +111,26 @@ public class KnowledgeChunk {
         return wordCount;
     }
 
+    public int getPageNumber() {
+        return pageNumber;
+    }
+
+    public String getPageRange() {
+        return pageRange;
+    }
+
+    public String getDocumentType() {
+        return documentType;
+    }
+
+    public String getVersion() {
+        return version;
+    }
+
+    public long getIngestionTimestamp() {
+        return ingestionTimestamp;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -103,8 +153,9 @@ public class KnowledgeChunk {
                 ", category='" + category + '\'' +
                 ", sourcePath='" + sourcePath + '\'' +
                 ", sectionTitle='" + sectionTitle + '\'' +
+                ", pageNumber=" + pageNumber +
+                ", version='" + version + '\'' +
                 ", wordCount=" + wordCount +
-                ", charCount=" + charCount +
                 '}';
     }
 }

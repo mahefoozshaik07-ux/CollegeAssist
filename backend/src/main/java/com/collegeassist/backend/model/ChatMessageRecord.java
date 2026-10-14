@@ -1,44 +1,14 @@
 package com.collegeassist.backend.model;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Index;
-import jakarta.persistence.Lob;
-import jakarta.persistence.Table;
-
-@Entity
-@Table(name = "chat_messages", indexes = {
-        @Index(name = "idx_msg_conv_id", columnList = "conversationId"),
-        @Index(name = "idx_msg_seq", columnList = "sequenceNumber")
-})
 public class ChatMessageRecord {
 
-    @Id
-    @Column(length = 64, nullable = false)
     private String id;
-
-    @Column(length = 64, nullable = false)
     private String conversationId;
-
-    @Column(nullable = false, length = 20)
     private String sender; // "user" or "assistant"
-
-    @Lob
-    @Column(columnDefinition = "TEXT", nullable = false)
     private String content;
-
-    @Column(length = 30)
     private String timestamp;
-
-    @Column(length = 30)
     private String status;
-
-    @Lob
-    @Column(columnDefinition = "TEXT")
     private String sourcesJson;
-
-    @Column(nullable = false)
     private Integer sequenceNumber;
 
     public ChatMessageRecord() {

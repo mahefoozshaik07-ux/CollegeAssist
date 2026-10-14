@@ -1,32 +1,11 @@
 package com.collegeassist.backend.model;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Index;
-import jakarta.persistence.Table;
-
-@Entity
-@Table(name = "chat_conversations", indexes = {
-        @Index(name = "idx_conv_student_email", columnList = "studentEmail"),
-        @Index(name = "idx_conv_updated_at", columnList = "updatedAt")
-})
 public class Conversation {
 
-    @Id
-    @Column(length = 64, nullable = false)
     private String id;
-
-    @Column(nullable = false, length = 120)
     private String studentEmail;
-
-    @Column(nullable = false, length = 200)
     private String title;
-
-    @Column(nullable = false)
     private Long createdAt;
-
-    @Column(nullable = false)
     private Long updatedAt;
 
     public Conversation() {

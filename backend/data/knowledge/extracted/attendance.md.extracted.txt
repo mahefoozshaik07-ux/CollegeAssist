@@ -1,0 +1,5 @@
+# Attendance Rules
+## Rule 1
+Rule 1 details.
+## Rule 2
+Rule 2 details.

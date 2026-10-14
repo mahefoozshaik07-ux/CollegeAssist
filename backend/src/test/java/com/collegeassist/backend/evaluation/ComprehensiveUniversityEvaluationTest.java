@@ -154,7 +154,7 @@ public class ComprehensiveUniversityEvaluationTest {
         documentKnowledgeService = new DocumentKnowledgeService("docs");
         documentKnowledgeService.loadDocuments();
         assertTrue(documentKnowledgeService.isLoaded(), "Knowledge base must be loaded");
-        assertEquals(7, documentKnowledgeService.getDocumentCount(), "Must load 7 institutional documents");
+        assertEquals(8, documentKnowledgeService.getDocumentCount(), "Must load 8 institutional documents");
 
         questionUnderstandingService = new QuestionUnderstandingService();
         retrievalService = new KnowledgeRetrievalService(documentKnowledgeService, 10.0, 3);

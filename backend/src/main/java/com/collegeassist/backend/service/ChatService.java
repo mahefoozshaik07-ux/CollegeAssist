@@ -48,8 +48,8 @@ public class ChatService {
 
     private final String geminiApiKey;
     private final String geminiModel;
-    private final int connectTimeoutSeconds;
-    private final int requestTimeoutSeconds;
+    private int connectTimeoutSeconds;
+    private int requestTimeoutSeconds;
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
     private KnowledgeRetrievalService retrievalService;
@@ -79,6 +79,7 @@ public class ChatService {
     }
 
     private static final List<String> KNOWLEDGE_CATEGORIES = Arrays.asList(
+            "academic",
             "attendance",
             "college-rules",
             "exam-rules",
@@ -96,39 +97,56 @@ public class ChatService {
     public ChatService(
             @Value("${collegeassist.ai.gemini-api-key:${GEMINI_API_KEY:}}") String geminiApiKey,
             @Value("${collegeassist.ai.model:${GEMINI_MODEL:gemini-3.8-flash}}") String geminiModel) {
-        this(geminiApiKey, geminiModel, HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(15)).build(), null, 15, 30);
-    }
-
-    public ChatService(
-            String geminiApiKey,
-            String geminiModel,
-            int connectTimeoutSeconds,
-            int requestTimeoutSeconds) {
-        this(geminiApiKey, geminiModel,
-                HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(connectTimeoutSeconds > 0 ? connectTimeoutSeconds : 15)).build(),
-                null,
-                connectTimeoutSeconds > 0 ? connectTimeoutSeconds : 15,
-                requestTimeoutSeconds > 0 ? requestTimeoutSeconds : 30);
+        this(geminiApiKey, geminiModel, null, null,
+                readIntProp("COLLEGEASSIST_AI_CONNECT_TIMEOUT", "collegeassist.ai.connect-timeout-seconds", 20),
+                readIntProp("COLLEGEASSIST_AI_REQUEST_TIMEOUT", "collegeassist.ai.request-timeout-seconds", 90));
     }
 
     public ChatService(String geminiApiKey, String geminiModel, HttpClient httpClient) {
-        this(geminiApiKey, geminiModel, httpClient, null, 15, 30);
+        this(geminiApiKey, geminiModel, httpClient, null, 20, 90);
     }
 
     public ChatService(String geminiApiKey, String geminiModel, HttpClient httpClient, KnowledgeRetrievalService retrievalService) {
-        this(geminiApiKey, geminiModel, httpClient, retrievalService, 15, 30);
+        this(geminiApiKey, geminiModel, httpClient, retrievalService, 20, 90);
     }
 
     public ChatService(String geminiApiKey, String geminiModel, HttpClient httpClient, KnowledgeRetrievalService retrievalService, int connectTimeoutSeconds, int requestTimeoutSeconds) {
         this.geminiApiKey = (geminiApiKey != null) ? geminiApiKey.trim() : "";
         this.geminiModel = (geminiModel != null && !geminiModel.isBlank()) ? geminiModel.trim() : "gemini-3.8-flash";
-        this.connectTimeoutSeconds = connectTimeoutSeconds > 0 ? connectTimeoutSeconds : 15;
-        this.requestTimeoutSeconds = requestTimeoutSeconds > 0 ? requestTimeoutSeconds : 30;
+        this.connectTimeoutSeconds = connectTimeoutSeconds > 0 ? connectTimeoutSeconds : 20;
+        this.requestTimeoutSeconds = requestTimeoutSeconds > 0 ? requestTimeoutSeconds : 90;
         this.httpClient = (httpClient != null)
                 ? httpClient
                 : HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(this.connectTimeoutSeconds)).build();
         this.retrievalService = retrievalService;
         this.objectMapper = new ObjectMapper();
+    }
+
+    private static int readIntProp(String envVar, String sysProp, int fallback) {
+        String val = System.getenv(envVar);
+        if (val == null || val.isBlank()) {
+            val = System.getProperty(sysProp);
+        }
+        if (val != null && !val.isBlank()) {
+            try {
+                return Integer.parseInt(val.trim());
+            } catch (NumberFormatException ignored) {}
+        }
+        return fallback;
+    }
+
+    @Autowired(required = false)
+    public void setRequestTimeoutSeconds(@Value("${collegeassist.ai.request-timeout-seconds:90}") int timeout) {
+        if (timeout > 0) {
+            this.requestTimeoutSeconds = timeout;
+        }
+    }
+
+    @Autowired(required = false)
+    public void setConnectTimeoutSeconds(@Value("${collegeassist.ai.connect-timeout-seconds:20}") int timeout) {
+        if (timeout > 0) {
+            this.connectTimeoutSeconds = timeout;
+        }
     }
 
     @Autowired(required = false)
@@ -145,6 +163,10 @@ public class ChatService {
         return this.retrievalService;
     }
 
+    public synchronized void reindex(boolean force) {
+        getEffectiveRetrievalService().reindex(force);
+    }
+
     public boolean isConfigured() {
         return !geminiApiKey.isEmpty();
     }
@@ -154,6 +176,51 @@ public class ChatService {
             return geminiModel.substring("models/".length());
         }
         return geminiModel;
+    }
+
+    public String buildGroundedFallbackContent(String query, List<ScoredKnowledgeChunk> matches, String errorHeading) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("### ⚠️ ").append(errorHeading).append("\n\n");
+        sb.append("The AI assistant is temporarily busy or experiencing high demand. ");
+        sb.append("However, based on verified institutional documentation, here are the official guidelines for your inquiry:\n\n");
+
+        AttendanceCalculation calc = parseAttendanceCalculation(query);
+        if (calc != null) {
+            sb.append(formatAttendanceCalculationBlock(calc)).append("\n---\n\n");
+        }
+        HostelRefundCalculation hostelCalc = parseHostelRefundCalculation(query);
+        if (hostelCalc != null) {
+            sb.append(formatHostelRefundCalculationBlock(hostelCalc)).append("\n---\n\n");
+        }
+
+        if (matches != null && !matches.isEmpty()) {
+            boolean hasRegulations = matches.stream().anyMatch(m -> m != null && m.getFilename() != null && m.getFilename().toLowerCase(Locale.ENGLISH).contains("academic-regulations"));
+            if (hasRegulations) {
+                sb.append("> **Regulation Notice:** Answers citing `Academic-Regulations.pdf` are based on **FFCS Academic Regulations Version 4.0**. Applicable regulations and credit boundaries may vary by student batch and curriculum; please confirm batch-specific rules on VTOP.\n\n");
+            }
+
+            sb.append("#### 🏛️ Verified University Documentation & Rules\n\n");
+            Set<String> seenSections = new LinkedHashSet<>();
+            for (ScoredKnowledgeChunk chunk : matches) {
+                if (chunk == null) continue;
+                String sectionTitle = chunk.getSectionTitle() != null ? chunk.getSectionTitle().trim() : "";
+                if (!sectionTitle.isBlank() && seenSections.add(sectionTitle)) {
+                    sb.append("##### 📋 ").append(sectionTitle);
+                    if (chunk.getPageNumber() > 0) {
+                        sb.append(" (Page ").append(chunk.getPageNumber()).append(")");
+                    }
+                    sb.append("\n");
+                    String content = chunk.getContent();
+                    if (content != null && !content.isBlank()) {
+                        sb.append(content.trim()).append("\n\n");
+                    }
+                }
+            }
+        }
+
+        sb.append("---\n");
+        sb.append("For urgent campus matters or individual records, please check the official [VTOP Student Portal](https://vtop.vitap.ac.in/) or contact your Proctor.\n");
+        return sb.toString();
     }
 
     public ChatStatusResponse getStatus() {
@@ -269,9 +336,7 @@ public class ChatService {
             String sanitizedError = sanitizeMessage(gce.getMessage());
             logger.error("Gemini configuration/client failure: {}", sanitizedError);
 
-            String fallbackContent = "### ⚠️ AI Service Unavailable\n\n"
-                    + "The AI assistant is currently unavailable due to a service configuration issue. Please check back later or consult verified information directly on the [VTOP Student Portal](https://vtop.vitap.ac.in/).\n\n"
-                    + "For immediate academic inquiries, please consult your department office or Proctor directly.";
+            String fallbackContent = buildGroundedFallbackContent(query, matches, "AI Service Unavailable");
 
             return new ChatResponse(
                     responseId,
@@ -285,9 +350,7 @@ public class ChatService {
             String sanitizedError = sanitizeMessage(gte.getMessage());
             logger.warn("Gemini temporary communication failure: {}", sanitizedError);
 
-            String fallbackContent = "### ⚠️ AI Service Temporarily Busy\n\n"
-                    + "The AI assistant is temporarily busy or experiencing high demand. Please wait a moment and try asking your question again.\n\n"
-                    + "For urgent campus matters, you can also check the official [VTOP Student Portal](https://vtop.vitap.ac.in/) or contact your Proctor.";
+            String fallbackContent = buildGroundedFallbackContent(query, matches, "AI Service Temporarily Busy");
 
             return new ChatResponse(
                     responseId,
@@ -301,9 +364,7 @@ public class ChatService {
             String sanitizedError = sanitizeMessage(ex.getMessage());
             logger.error("Unexpected error during AI generation: {}", sanitizedError, ex);
 
-            String fallbackContent = "### ⚠️ AI Service Temporarily Busy\n\n"
-                    + "The AI assistant is temporarily busy or experiencing high demand. Please wait a moment and try asking your question again.\n\n"
-                    + "For urgent campus matters, you can also check the official [VTOP Student Portal](https://vtop.vitap.ac.in/) or contact your Proctor.";
+            String fallbackContent = buildGroundedFallbackContent(query, matches, "AI Service Temporarily Busy");
 
             return new ChatResponse(
                     responseId,
@@ -346,7 +407,11 @@ public class ChatService {
                             "Verified Evidence",
                             cleanSection,
                             cleanSection,
-                            filename
+                            filename,
+                            match.getPageNumber(),
+                            match.getPageRange(),
+                            match.getDocumentTitle(),
+                            match.getVersion()
                     ));
                 }
             }
@@ -629,7 +694,11 @@ public class ChatService {
         for (SourceReference source : sources) {
             String bulletKey = source.getDocumentPath() + "::" + source.getSectionTitle();
             if (seenDocBullets.add(bulletKey)) {
-                sb.append("- **").append(source.getCategory()).append("** (`").append(source.getDocumentPath()).append("`)\n");
+                sb.append("- **").append(source.getCategory()).append("** (`").append(source.getDocumentPath()).append("`");
+                if (source.getPageNumber() > 0) {
+                    sb.append(", Page ").append(source.getPageNumber());
+                }
+                sb.append(")\n");
                 if (source.getSectionTitle() != null && !source.getSectionTitle().isBlank()) {
                     sb.append("  *Section: ").append(source.getSectionTitle()).append("*\n");
                 } else if (source.getRelevanceNote() != null) {
@@ -684,8 +753,10 @@ public class ChatService {
         systemContext.append("   - Academic Calendar: Never invent dates for semester commencement, CAT-1, CAT-2, Last Instructional Day, or FAT exams. State clearly that active semester dates are pending official calendar publication.\n");
         systemContext.append("3. MISSING INFORMATION & PENDING VERIFICATION: If the provided evidence does not contain the answer, or if an item is labeled as pending official verification or is a template, explicitly inform the student that official verified details for this item are currently unavailable in university records, and advise the student to consult VTOP or the academic office.\n");
         systemContext.append("4. CONFLICTING SOURCE DOCUMENTS: If retrieved evidence passages present conflicting, differing, or varying rules (e.g. batch-specific thresholds or differing committee procedures), explicitly present both perspectives or explain the discrepancy to the student and advise consulting the issuing university authority for clarification.\n");
-        systemContext.append("5. CITATIONS & GROUNDING: Verify that every cited Markdown section exists in the provided evidence and that the quoted or summarized information actually appears in it. Only cite evidence retrieved and supplied in the prompt. Do not fabricate official status or claim current verification without evidence. Never output duplicate or concatenated citation strings (such as 'docA.mddocB.md' or running paths together); each citation must be clean, distinct, and standalone.\n");
-        systemContext.append("6. FORMATTING: Use clean, structured Markdown with bullet points and concise sections. Use verified link syntax [VTOP Student Portal](https://vtop.vitap.ac.in/) when referencing the VTOP portal.");
+        systemContext.append("5. CITATIONS & EXACT PAGE NUMBERS: Verify that every cited document section exists in the provided evidence. When answering from PDF regulations (such as Academic-Regulations.pdf), cite the document title, section title, and the exact PDF page number (e.g. `[FFCS Academic Regulations, Section 8, Page 21]`). NEVER invent, assume, or fabricate page numbers; only cite page numbers explicitly indicated in the evidence items. Never output duplicate or concatenated citation strings (such as 'docA.mddocB.md'); each citation must be clean, distinct, and standalone.\n");
+        systemContext.append("6. UNANSWERED QUESTIONS / LIMITATIONS: If the retrieved document evidence does not contain the answer to the student's question, clearly state: 'This information was not found in the indexed university documents. Please verify with the university Academic Office or check the official VTOP Student Portal.' Never guess or extrapolate unverified rules.\n");
+        systemContext.append("7. VERSION & BATCH SAFETY: When citing Academic-Regulations.pdf, identify the regulation as FFCS Academic Regulations Version 4.0. Note to the student that curriculum details and credit limits may vary across student batches or specific programmes, and advise them to verify batch-specific rules on VTOP.\n");
+        systemContext.append("8. FORMATTING: Use clean, structured Markdown with bullet points and concise sections. Use verified link syntax [VTOP Student Portal](https://vtop.vitap.ac.in/) when referencing the VTOP portal.");
         return systemContext.toString();
     }
 
@@ -740,8 +811,15 @@ public class ChatService {
                 }
                 throw new GeminiTransientException("Failed to connect to AI provider after " + maxAttempts + " attempts", ce);
             } catch (HttpTimeoutException te) {
-                // Priority 3: "avoid retrying a request after an ambiguous timeout if it could cause excessive quota consumption"
-                logger.warn("Request timed out after waiting for Gemini response on attempt {}/{}. Not retrying to avoid excessive quota consumption: {}",
+                lastIoException = te;
+                if (attempt < maxAttempts) {
+                    long backoffMs = calculateBackoff(attempt, null);
+                    logger.warn("Request timed out waiting for Gemini response on attempt {}/{}, retrying in {}ms: {}",
+                            attempt, maxAttempts, backoffMs, te.getMessage());
+                    sleepWithJitter(backoffMs);
+                    continue;
+                }
+                logger.warn("Request timed out after waiting for Gemini response on attempt {}/{}. Max attempts reached: {}",
                         attempt, maxAttempts, te.getMessage());
                 throw new GeminiTransientException("AI service request timed out", te);
             } catch (IOException ioe) {
@@ -846,6 +924,12 @@ public class ChatService {
             userContent.append("Document: ").append(sc.getDocumentTitle()).append("\n");
             userContent.append("Source Path: ").append(sc.getSourcePath()).append("\n");
             userContent.append("Section Title: ").append(sc.getSectionTitle()).append("\n");
+            if (sc.getPageNumber() > 0) {
+                userContent.append("PDF Page Number: ").append(sc.getPageNumber()).append("\n");
+            }
+            if (sc.getVersion() != null && !sc.getVersion().isBlank()) {
+                userContent.append("Version: ").append(sc.getVersion()).append("\n");
+            }
             userContent.append("Content:\n").append(sc.getContent()).append("\n\n");
         }
         userContent.append("=== END OFFICIAL VIT-AP EVIDENCE ===\n\n");
@@ -877,13 +961,20 @@ public class ChatService {
             Map<String, Object> root = new LinkedHashMap<>();
             root.put("system_instruction", Map.of("parts", List.of(Map.of("text", systemInstruction))));
             root.put("contents", List.of(Map.of("role", "user", "parts", List.of(Map.of("text", userContent.toString())))));
+
+            Map<String, Object> genConfig = new LinkedHashMap<>();
+            genConfig.put("temperature", 0.2);
+            genConfig.put("maxOutputTokens", 1500);
+            root.put("generationConfig", genConfig);
+
             return objectMapper.writeValueAsString(root);
         } catch (Exception e) {
             String escapedSystem = escapeJson(systemInstruction);
             String escapedUser = escapeJson(userContent.toString());
             return "{"
                     + "\"system_instruction\":{\"parts\":[{\"text\":\"" + escapedSystem + "\"}]},"
-                    + "\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"" + escapedUser + "\"}]}]"
+                    + "\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"" + escapedUser + "\"}]}],"
+                    + "\"generationConfig\":{\"temperature\":0.2,\"maxOutputTokens\":1500}"
                     + "}";
         }
     }

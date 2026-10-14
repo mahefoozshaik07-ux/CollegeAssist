@@ -84,7 +84,8 @@ public class KnowledgeRetrievalService {
             "recruitment", "ppo", "ctc", "package", "super dream", "dream offer", "job", "career",
             // Discipline & Notices
             "ragging", "anti-ragging", "udc", "disciplinary", "discipline", "id card", "rules", "regulations",
-            "circular", "circulars", "notice", "notices", "handbook", "policy", "policies"
+            "circular", "circulars", "notice", "notices", "handbook", "policy", "policies",
+            "cat-i", "cat-ii", "add/drop", "passing criteria"
     );
 
     /**
@@ -135,6 +136,14 @@ public class KnowledgeRetrievalService {
     @Autowired(required = false)
     public void setHybridRetrievalService(HybridRetrievalService hybridRetrievalService) {
         this.hybridRetrievalService = hybridRetrievalService;
+    }
+
+    public synchronized void reindex(boolean force) {
+        if (this.hybridRetrievalService != null) {
+            this.hybridRetrievalService.reindex(force);
+        } else {
+            this.documentKnowledgeService.reindex(force);
+        }
     }
 
     /**
@@ -280,6 +289,26 @@ public class KnowledgeRetrievalService {
             }
         }
 
+        // If query asks for attendance requirements/eligibility/threshold/shortage, boost the section specifically covering minimum threshold
+        if (chunk.getSourcePath().contains("attendance-policy.md") && secTitleNorm.contains("minimum attendance threshold")) {
+            boolean hasAttendanceToken = queryTokens.contains("attendance");
+            boolean hasReqToken = queryTokens.contains("requirement") || queryTokens.contains("requirements")
+                    || queryTokens.contains("threshold") || queryTokens.contains("eligibility") || queryTokens.contains("minimum")
+                    || queryTokens.contains("shortage");
+            if (hasAttendanceToken && hasReqToken) {
+                score += 30.0;
+                matchedTerms.add("attendance-threshold-section (attendance-policy.md)");
+            }
+        }
+
+        // Boost grading sections for F and N grades comparison queries
+        if (queryTokens.contains("f") && queryTokens.contains("n")) {
+            if (secTitleNorm.contains("grading system") || secTitleNorm.contains("table 4") || secTitleNorm.contains("letter grade") || secTitleNorm.contains("backlog")) {
+                score += 20.0;
+                matchedTerms.add("f-and-n-grades-boost");
+            }
+        }
+
         List<String> secTitleTokens = extractTokens(secTitleNorm);
         List<String> secTitleStems = secTitleTokens.stream().map(this::stemWord).collect(Collectors.toList());
 
@@ -396,10 +425,11 @@ public class KnowledgeRetrievalService {
         Matcher matcher = WORD_PATTERN.matcher(text.toLowerCase(Locale.ENGLISH));
         while (matcher.find()) {
             String word = matcher.group();
-            if (word.length() > 1 || Character.isDigit(word.charAt(0))) {
+            if (word.length() > 1 || Character.isDigit(word.charAt(0)) || "fnwups".indexOf(word.charAt(0)) != -1) {
                 tokens.add(word);
             }
         }
+
         return tokens;
     }
 
